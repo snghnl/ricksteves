@@ -1,0 +1,172 @@
+{
+  "summary": {
+    "total_museums": 168,
+    "total_posts": 3719,
+    "total_replies": 47601,
+    "total_audio_guide_mentions": 22638
+  },
+  "top_museums_by_engagement": [
+    {
+      "museum": "Unknown Museum",
+      "forum": "Unknown",
+      "total_posts": 2082,
+      "total_replies": 29714,
+      "total_engagement": 31796
+    },
+    {
+      "museum": "Vatican Museums",
+      "forum": "Unknown",
+      "total_posts": 441,
+      "total_replies": 4349,
+      "total_engagement": 4790
+    },
+    {
+      "museum": "Florence Museums",
+      "forum": "Unknown",
+      "total_posts": 120,
+      "total_replies": 1817,
+      "total_engagement": 1937
+    },
+    {
+      "museum": "Pompeii",
+      "forum": "Unknown",
+      "total_posts": 156,
+      "total_replies": 1487,
+      "total_engagement": 1643
+    },
+    {
+      "museum": "Louvre Museum",
+      "forum": "Unknown",
+      "total_posts": 104,
+      "total_replies": 1493,
+      "total_engagement": 1597
+    },
+    {
+      "museum": "Tate Modern",
+      "forum": "Unknown",
+      "total_posts": 82,
+      "total_replies": 1327,
+      "total_engagement": 1409
+    },
+    {
+      "museum": "Colosseum",
+      "forum": "Unknown",
+      "total_posts": 119,
+      "total_replies": 1104,
+      "total_engagement": 1223
+    },
+    {
+      "museum": "Alhambra",
+      "forum": "Unknown",
+      "total_posts": 92,
+      "total_replies": 761,
+      "total_engagement": 853
+    },
+    {
+      "museum": "British Museum",
+      "forum": "Unknown",
+      "total_posts": 47,
+      "total_replies": 789,
+      "total_engagement": 836
+    },
+    {
+      "museum": "Budapest Museums",
+      "forum": "Unknown",
+      "total_posts": 37,
+      "total_replies": 701,
+      "total_engagement": 738
+    }
+  ],
+  "top_museums_by_sentiment": [
+    {
+      "museum": "National Museum",
+      "forum": "Unknown",
+      "sentiment_score": 0.1796053020267749,
+      "positive_reactions": 1,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "London - Windsor Palace",
+      "forum": "Unknown",
+      "sentiment_score": 0.14310793051573775,
+      "positive_reactions": 3,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Should We Get An English-Speaking Guide To Tour The Museum",
+      "forum": "Unknown",
+      "sentiment_score": 0.1385153521928549,
+      "positive_reactions": 6,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Athens Archaeological Museum",
+      "forum": "Unknown",
+      "sentiment_score": 0.13178933398747736,
+      "positive_reactions": 5,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Esterhazy Castle",
+      "forum": "Unknown",
+      "sentiment_score": 0.13062534076137397,
+      "positive_reactions": 2,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Best Way To Get Tickets For St. Mark'S Basilica And The Doge'S Palace",
+      "forum": "Unknown",
+      "sentiment_score": 0.12649168379832076,
+      "positive_reactions": 4,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Visiting Hampton Court Palace",
+      "forum": "Unknown",
+      "sentiment_score": 0.12189040442119906,
+      "positive_reactions": 9,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Difficulty With Purchasing Picasso Museum",
+      "forum": "Unknown",
+      "sentiment_score": 0.1125087900926024,
+      "positive_reactions": 1,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Vienna Tour Guide Part 2 Schönbrunn Palace",
+      "forum": "Unknown",
+      "sentiment_score": 0.11139936165292147,
+      "positive_reactions": 3,
+      "negative_reactions": 0
+    },
+    {
+      "museum": "Amsterdam Van Gogh Museum",
+      "forum": "Unknown",
+      "sentiment_score": 0.10933466102186744,
+      "positive_reactions": 3,
+      "negative_reactions": 0
+    }
+  ],
+  "forum_distribution": {
+    "Unknown": 168
+  },
+  "theme_distribution": {
+    "rick steves guide": 152,
+    "time management": 127,
+    "advance booking": 110,
+    "audio quality": 168,
+    "paid service": 108,
+    "guided tours": 80,
+    "mobile app": 99,
+    "physical device": 95,
+    "free service": 87,
+    "digital download": 60,
+    "multilingual": 70,
+    "skip the line": 6,
+    "complexity issues": 14,
+    "availability issues": 5
+  },
+  "time_trends": {}
+}
