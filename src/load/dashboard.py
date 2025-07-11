@@ -33,6 +33,44 @@ class RickStevesDashboard:
         self.comparison_path = Path(comparison_path)
         self.enhanced_posts_path = Path(enhanced_posts_path)
         self.load_data()
+        self.setup_museum_categories()
+    
+    def setup_museum_categories(self):
+        """Setup museum categories for sidebar navigation."""
+        self.major_museums = {
+            "국립중앙박물관": "National Museum of Korea",
+            "대영박물관": "British Museum",
+            "테이트 모던": "Tate Modern", 
+            "루브르 박물관": "Louvre Museum",
+            "우피치 미술관": "Uffizi Gallery",
+            "메트로폴리탄 미술관": "Metropolitan Museum of Art",
+            "프라도 미술관": "Prado Museum"
+        }
+        
+        # Get all available museum names
+        all_museums = self.get_museum_names()
+        
+        # Separate major museums and others
+        self.available_major_museums = {}
+        self.other_museums = []
+        
+        for korean_name, english_name in self.major_museums.items():
+            # Check if this museum exists in our data
+            for museum in all_museums:
+                if english_name.lower() in museum.lower() or korean_name.lower() in museum.lower():
+                    self.available_major_museums[korean_name] = museum
+                    break
+        
+        # Get other museums (not in major list)
+        major_english_names = [name.lower() for name in self.major_museums.values()]
+        for museum in all_museums:
+            is_major = False
+            for major_name in major_english_names:
+                if major_name in museum.lower():
+                    is_major = True
+                    break
+            if not is_major:
+                self.other_museums.append(museum)
     
     def load_data(self) -> None:
         """Load metrics, comparison, and enhanced posts data from JSON files."""
@@ -435,18 +473,59 @@ class RickStevesDashboard:
         st.markdown("---")
         
         # Sidebar for navigation
-        st.sidebar.title("Navigation")
+        st.sidebar.title("🎧 Museum Selection")
         
-        # Museum selection
-        museum_names = self.get_museum_names()
-        selected_museum = st.sidebar.selectbox(
-            "Select Museum",
-            museum_names,
-            index=0 if museum_names else None
-        )
+        # Museum selection with categories
+        if self.available_major_museums:
+            st.sidebar.markdown("### 🏛️ Major Museums")
+            major_museum_options = list(self.available_major_museums.keys())
+            selected_major = st.sidebar.selectbox(
+                "Select Major Museum",
+                ["-- Select Major Museum --"] + major_museum_options,
+                index=0
+            )
+            
+            if selected_major != "-- Select Major Museum --":
+                selected_museum = self.available_major_museums[selected_major]
+            else:
+                selected_museum = None
+        else:
+            selected_museum = None
+        
+        # Other museums section
+        if self.other_museums:
+            st.sidebar.markdown("### 📚 Other Museums")
+            other_museum_options = ["-- Select Other Museum --"] + self.other_museums
+            selected_other = st.sidebar.selectbox(
+                "Select Other Museum",
+                other_museum_options,
+                index=0
+            )
+            
+            if selected_other != "-- Select Other Museum --":
+                selected_museum = selected_other
+            elif selected_museum is None:
+                selected_museum = None
+        
+        # Add statistics to sidebar
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 📊 Statistics")
+        st.sidebar.markdown(f"**Total Museums:** {len(self.get_museum_names())}")
+        st.sidebar.markdown(f"**Major Museums:** {len(self.available_major_museums)}")
+        st.sidebar.markdown(f"**Other Museums:** {len(self.other_museums)}")
+        
+        if selected_museum:
+            museum_data = self.get_museum_data(selected_museum)
+            if museum_data:
+                st.sidebar.markdown("---")
+                st.sidebar.markdown("### 🎯 Selected Museum")
+                st.sidebar.markdown(f"**Name:** {selected_museum}")
+                st.sidebar.markdown(f"**Posts:** {museum_data.get('total_posts', 0)}")
+                st.sidebar.markdown(f"**Replies:** {museum_data.get('total_replies', 0)}")
+                st.sidebar.markdown(f"**Sentiment:** {museum_data.get('audio_guide_sentiment_score', 0):.3f}")
         
         if not selected_museum:
-            st.warning("No museum data available.")
+            st.warning("Please select a museum from the sidebar.")
             return
         
         # Main content area
