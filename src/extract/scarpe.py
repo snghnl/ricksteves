@@ -1,19 +1,56 @@
 import json
 import asyncio
-from httpx import AsyncClient
+import random
+import time
+from httpx import AsyncClient, HTTPStatusError
 from parsel import Selector
 from loguru import logger as log
 
 from ..constant import DATA_DIR
 
 
+# Constants for rate limiting
+REQUEST_DELAY_MIN = 1.0  # Minimum delay between requests (seconds)
+REQUEST_DELAY_MAX = 3.0  # Maximum delay between requests (seconds)
+MAX_RETRIES = 3  # Maximum number of retries for failed requests
+RETRY_DELAY_BASE = 2.0  # Base delay for exponential backoff
+
+
+async def delay_request():
+    """Add a random delay between requests to avoid rate limiting"""
+    delay = random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX)
+    await asyncio.sleep(delay)
+
+
 # scrape travel forum list by keyword
 
-async def scrap_travel_forum_list_by_keyword(keyword: str, page: int = 1):
-    async with AsyncClient(http2=True, timeout=10.0) as client:
-        log.info(f"Scraping travel forum list by keyword: {keyword}, page: {page}")
-        response = await client.get(f"https://search.ricksteves.com/?button=&filter=Travel+Forum&page={page}&query={keyword.replace(' ', '+')}")
-        return response.text
+async def scrap_travel_forum_list_by_keyword(keyword: str, page: int = 1, retry_count: int = 0):
+    """Scrape travel forum list with retry logic and rate limiting"""
+    try:
+        # Add delay before making request
+        await delay_request()
+        
+        async with AsyncClient(http2=True, timeout=30.0) as client:
+            log.info(f"Scraping travel forum list by keyword: {keyword}, page: {page}")
+            response = await client.get(f"https://search.ricksteves.com/?button=&filter=Travel+Forum&page={page}&query={keyword.replace(' ', '+')}")
+            
+            response.raise_for_status()
+            return response.text
+            
+    except HTTPStatusError as e:
+        if e.response.status_code == 429 and retry_count < MAX_RETRIES:
+            # Exponential backoff for rate limiting
+            retry_delay = RETRY_DELAY_BASE ** (retry_count + 1)
+            log.warning(f"Rate limited (429) on page {page}. Retrying in {retry_delay} seconds... (attempt {retry_count + 1}/{MAX_RETRIES})")
+            await asyncio.sleep(retry_delay)
+            return await scrap_travel_forum_list_by_keyword(keyword, page, retry_count + 1)
+        else:
+            log.error(f"HTTP error {e.response.status_code} on page {page}: {e}")
+            raise
+    except Exception as e:
+        log.error(f"Unexpected error on page {page}: {e}")
+        raise
+
 
 def parse_travel_forum_list_by_keyword(html: str):
     selector = Selector(html)
@@ -52,38 +89,65 @@ def parse_travel_forum_list_by_keyword(html: str):
     
     return scraped_data
 
-async def get_travel_forum_list_by_keyword(keyword: str, start_page: int = 1, end_page: int = 276, max_concurrent: int = 10):
-    """Complete function to scrape and parse travel forum data with concurrent processing"""
+async def get_travel_forum_list_by_keyword(keyword: str, start_page: int = 1, end_page: int = 276, max_concurrent: int = 5):
+    """Complete function to scrape and parse travel forum data with concurrent processing and rate limiting"""
     posts = []
     
-    # Create semaphore to limit concurrent requests
+    # Reduce max_concurrent to avoid overwhelming the server
     semaphore = asyncio.Semaphore(max_concurrent)
     
     async def scrape_page(page):
         async with semaphore:
-            html = await scrap_travel_forum_list_by_keyword(keyword, page)
-            return parse_travel_forum_list_by_keyword(html)
+            try:
+                html = await scrap_travel_forum_list_by_keyword(keyword, page)
+                return parse_travel_forum_list_by_keyword(html)
+            except Exception as e:
+                log.error(f"Failed to scrape page {page}: {e}")
+                return []  # Return empty list for failed pages
     
     # Create tasks for all pages
     tasks = [scrape_page(page) for page in range(start_page, end_page + 1)]
     
     # Execute all tasks concurrently
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    # Combine all results
-    for result in results:
+    # Combine all results, handling exceptions
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            log.error(f"Task {i + start_page} failed: {result}")
+            continue
         posts.extend(result)
 
+    log.info(f"Successfully scraped {len(posts)} posts")
     with open(DATA_DIR / f"posts_{keyword.replace(' ', '_')}.json", "w") as f:
         json.dump(posts, f, indent=2, ensure_ascii=False)
 
 
-async def scrape_post_detail(post_link: str) -> str:
-    """Scrape the HTML content of a post detail page"""
-    async with AsyncClient(http2=True, timeout=10.0) as client:
-        log.info(f"Scraping post detail: {post_link}")
-        response = await client.get(post_link)
-        return response.text
+async def scrape_post_detail(post_link: str, retry_count: int = 0) -> str:
+    """Scrape the HTML content of a post detail page with retry logic"""
+    try:
+        # Add delay before making request
+        await delay_request()
+        
+        async with AsyncClient(http2=True, timeout=30.0) as client:
+            log.info(f"Scraping post detail: {post_link}")
+            response = await client.get(post_link)
+            response.raise_for_status()
+            return response.text
+            
+    except HTTPStatusError as e:
+        if e.response.status_code == 429 and retry_count < MAX_RETRIES:
+            # Exponential backoff for rate limiting
+            retry_delay = RETRY_DELAY_BASE ** (retry_count + 1)
+            log.warning(f"Rate limited (429) for {post_link}. Retrying in {retry_delay} seconds... (attempt {retry_count + 1}/{MAX_RETRIES})")
+            await asyncio.sleep(retry_delay)
+            return await scrape_post_detail(post_link, retry_count + 1)
+        else:
+            log.error(f"HTTP error {e.response.status_code} for {post_link}: {e}")
+            raise
+    except Exception as e:
+        log.error(f"Unexpected error for {post_link}: {e}")
+        raise
 
 
 def parse_post_detail(html: str) -> dict:
@@ -161,30 +225,50 @@ async def get_post_detail(post_link: str) -> dict:
     return parse_post_detail(html)
 
 
-async def process_all_post_details(posts: list, max_concurrent: int = 10) -> list:
-    """Process all post details concurrently"""
+async def process_all_post_details(posts: list, max_concurrent: int = 5) -> list:
+    """Process all post details concurrently with rate limiting"""
     semaphore = asyncio.Semaphore(max_concurrent)
     
     async def process_single_post(post):
         async with semaphore:
-            return await get_post_detail(post["link"])
+            try:
+                return await get_post_detail(post["link"])
+            except Exception as e:
+                log.error(f"Failed to process post {post.get('link', 'unknown')}: {e}")
+                return None  # Return None for failed posts
     
     # Create tasks for all posts
     tasks = [process_single_post(post) for post in posts]
     
     # Execute all tasks concurrently
-    return await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Filter out None results and exceptions
+    valid_results = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            log.error(f"Task {i} failed: {result}")
+            continue
+        if result is not None:
+            valid_results.append(result)
+    
+    log.info(f"Successfully processed {len(valid_results)} out of {len(posts)} posts")
+    return valid_results
+
+
+async def main():
+    with open(DATA_DIR / "posts_audio_guide.json", "r") as f:
+        posts = json.load(f)
+
+    posts_detail = await process_all_post_details(posts)
+
+    with open(DATA_DIR / "posts_audio_guide_detail.json", "w") as f:
+        json.dump(posts_detail, f, indent=2, ensure_ascii=False)
+
+
 
 
 if __name__ == "__main__":
-    async def main():
-        with open(DATA_DIR / "posts_audio_guide.json", "r") as f:
-            posts = json.load(f)
-
-        posts_detail = await process_all_post_details(posts)
-
-        with open(DATA_DIR / "posts_audio_guide_detail.json", "w") as f:
-            json.dump(posts_detail, f, indent=2, ensure_ascii=False)
 
     # Run the async main function
     asyncio.run(main())
