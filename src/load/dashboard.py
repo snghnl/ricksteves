@@ -80,6 +80,18 @@ class RickStevesDashboard:
     def load_data(self) -> None:
         """Load metrics, comparison, and enhanced posts data from JSON files."""
         try:
+            # Debug: Print file paths
+            if is_running_in_streamlit():
+                st.info(f"Loading data from:\n- Metrics: {self.metrics_path}\n- Comparison: {self.comparison_path}\n- Enhanced Posts: {self.enhanced_posts_path}")
+            
+            # Check if files exist
+            if not self.metrics_path.exists():
+                raise FileNotFoundError(f"Metrics file not found: {self.metrics_path}")
+            if not self.comparison_path.exists():
+                raise FileNotFoundError(f"Comparison file not found: {self.comparison_path}")
+            if not self.enhanced_posts_path.exists():
+                raise FileNotFoundError(f"Enhanced posts file not found: {self.enhanced_posts_path}")
+            
             with open(self.metrics_path, 'r', encoding='utf-8') as f:
                 self.metrics_data = json.load(f)
             
@@ -88,15 +100,27 @@ class RickStevesDashboard:
             
             with open(self.enhanced_posts_path, 'r', encoding='utf-8') as f:
                 self.enhanced_posts_data = json.load(f)
+                
+            # Debug: Print data summary
+            if is_running_in_streamlit():
+                st.success(f"Data loaded successfully:\n- {len(self.metrics_data)} museums\n- {len(self.enhanced_posts_data)} posts")
+                
         except FileNotFoundError as e:
             if is_running_in_streamlit():
                 st.error(f"Data file not found: {e}")
+                st.info("Please ensure all data files are present in the repository.")
                 st.stop()
             else:
                 raise
         except json.JSONDecodeError as e:
             if is_running_in_streamlit():
                 st.error(f"Invalid JSON data: {e}")
+                st.stop()
+            else:
+                raise
+        except Exception as e:
+            if is_running_in_streamlit():
+                st.error(f"Error loading data: {e}")
                 st.stop()
             else:
                 raise
@@ -745,11 +769,54 @@ class RickStevesDashboard:
 
 def main():
     """Main function to run the dashboard."""
-    # Initialize dashboard
+    # Get the current script directory
+    script_dir = Path(__file__).parent
+    
+    # Define data file paths relative to the script directory
+    metrics_path = script_dir.parent / "transform" / "audio_guide_metrics.json"
+    comparison_path = script_dir.parent / "transform" / "museum_comparison.json"
+    enhanced_posts_path = script_dir.parent / "transform" / "enhanced_posts.json"
+    
+    # Check if files exist and provide fallback paths
+    if not metrics_path.exists():
+        # Try alternative paths for deployment
+        alt_paths = [
+            Path("src/transform/audio_guide_metrics.json"),
+            Path("transform/audio_guide_metrics.json"),
+            Path("audio_guide_metrics.json")
+        ]
+        for alt_path in alt_paths:
+            if alt_path.exists():
+                metrics_path = alt_path
+                break
+    
+    if not comparison_path.exists():
+        alt_paths = [
+            Path("src/transform/museum_comparison.json"),
+            Path("transform/museum_comparison.json"),
+            Path("museum_comparison.json")
+        ]
+        for alt_path in alt_paths:
+            if alt_path.exists():
+                comparison_path = alt_path
+                break
+    
+    if not enhanced_posts_path.exists():
+        alt_paths = [
+            Path("src/transform/enhanced_posts.json"),
+            Path("transform/enhanced_posts.json"),
+            Path("enhanced_posts.json")
+        ]
+        for alt_path in alt_paths:
+            if alt_path.exists():
+                enhanced_posts_path = alt_path
+                break
+    
+    # Initialize dashboard with resolved paths
     dashboard = RickStevesDashboard(
-        metrics_path="../transform/audio_guide_metrics.json",
-        comparison_path="../transform/museum_comparison.json",
-        enhanced_posts_path="../transform/enhanced_posts.json"
+        metrics_path=str(metrics_path),
+        comparison_path=str(comparison_path),
+        enhanced_posts_path=str(enhanced_posts_path)
     )
     
     # Run dashboard
