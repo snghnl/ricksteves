@@ -1,19 +1,19 @@
 import json
-from httpx import Client
+import asyncio
+from httpx import AsyncClient
 from parsel import Selector
 from loguru import logger as log
 
 from ..constant import DATA_DIR
 
 
-
 # scrape travel forum list by keyword
 
-def scrap_travel_forum_list_by_keyword(keyword: str, page: int = 1):
-    client = Client(http2=True, timeout=10.0)
-    log.info(f"Scraping travel forum list by keyword: {keyword}, page: {page}")
-    response = client.get(f"https://search.ricksteves.com/?button=&filter=Travel+Forum&page={page}&query={keyword.replace(' ', '+')}")
-    return response.text
+async def scrap_travel_forum_list_by_keyword(keyword: str, page: int = 1):
+    async with AsyncClient(http2=True, timeout=10.0) as client:
+        log.info(f"Scraping travel forum list by keyword: {keyword}, page: {page}")
+        response = await client.get(f"https://search.ricksteves.com/?button=&filter=Travel+Forum&page={page}&query={keyword.replace(' ', '+')}")
+        return response.text
 
 def parse_travel_forum_list_by_keyword(html: str):
     selector = Selector(html)
@@ -52,25 +52,38 @@ def parse_travel_forum_list_by_keyword(html: str):
     
     return scraped_data
 
-def get_travel_forum_list_by_keyword(keyword: str, start_page: int = 1, end_page: int = 276):
-    """Complete function to scrape and parse travel forum data"""
+async def get_travel_forum_list_by_keyword(keyword: str, start_page: int = 1, end_page: int = 276, max_concurrent: int = 10):
+    """Complete function to scrape and parse travel forum data with concurrent processing"""
     posts = []
-    for page in range(start_page, end_page + 1):
-        html = scrap_travel_forum_list_by_keyword(keyword, page)
-        posts.extend(parse_travel_forum_list_by_keyword(html))
-
+    
+    # Create semaphore to limit concurrent requests
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def scrape_page(page):
+        async with semaphore:
+            html = await scrap_travel_forum_list_by_keyword(keyword, page)
+            return parse_travel_forum_list_by_keyword(html)
+    
+    # Create tasks for all pages
+    tasks = [scrape_page(page) for page in range(start_page, end_page + 1)]
+    
+    # Execute all tasks concurrently
+    results = await asyncio.gather(*tasks)
+    
+    # Combine all results
+    for result in results:
+        posts.extend(result)
 
     with open(DATA_DIR / f"posts_{keyword.replace(' ', '_')}.json", "w") as f:
         json.dump(posts, f, indent=2, ensure_ascii=False)
 
 
-
-def scrape_post_detail(post_link: str) -> str:
+async def scrape_post_detail(post_link: str) -> str:
     """Scrape the HTML content of a post detail page"""
-    client = Client(http2=True, timeout=10.0)
-    log.info(f"Scraping post detail: {post_link}")
-    response = client.get(post_link)
-    return response.text
+    async with AsyncClient(http2=True, timeout=10.0) as client:
+        log.info(f"Scraping post detail: {post_link}")
+        response = await client.get(post_link)
+        return response.text
 
 
 def parse_post_detail(html: str) -> dict:
@@ -142,27 +155,39 @@ def parse_post_detail(html: str) -> dict:
     }
 
 
-def get_post_detail(post_link: str) -> dict:
+async def get_post_detail(post_link: str) -> dict:
     """Complete function to scrape and parse post detail data"""
-    html = scrape_post_detail(post_link)
+    html = await scrape_post_detail(post_link)
     return parse_post_detail(html)
 
 
-
-
+async def process_all_post_details(posts: list, max_concurrent: int = 10) -> list:
+    """Process all post details concurrently"""
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def process_single_post(post):
+        async with semaphore:
+            return await get_post_detail(post["link"])
+    
+    # Create tasks for all posts
+    tasks = [process_single_post(post) for post in posts]
+    
+    # Execute all tasks concurrently
+    return await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
-    with open(DATA_DIR / "posts_audio_guide.json", "r") as f:
-        posts = json.load(f)
+    async def main():
+        with open(DATA_DIR / "posts_audio_guide.json", "r") as f:
+            posts = json.load(f)
 
+        posts_detail = await process_all_post_details(posts)
 
-    posts_detail = []
-    for post in posts:
-        posts_detail.append(get_post_detail(post["link"]))
+        with open(DATA_DIR / "posts_audio_guide_detail.json", "w") as f:
+            json.dump(posts_detail, f, indent=2, ensure_ascii=False)
 
-    with open(DATA_DIR / "posts_audio_guide_detail.json", "w") as f:
-        json.dump(posts_detail, f, indent=2, ensure_ascii=False)
+    # Run the async main function
+    asyncio.run(main())
 
 
 
