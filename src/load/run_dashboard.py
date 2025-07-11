@@ -52,7 +52,7 @@ def main():
         subprocess.run([
             sys.executable, "-m", "streamlit", "run", str(dashboard_script),
             "--server.port", "8502",
-            "--server.address", "localhost"
+            "--server.address", "0.0.0.0"
         ], check=True)
     except subprocess.CalledProcessError as e:
         print(f"Error running dashboard: {e}")
