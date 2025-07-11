@@ -27,6 +27,11 @@ def test_data_loading():
         print(f"✅ Found {len(museum_names)} museums")
         print(f"   First 5 museums: {museum_names[:5]}")
         
+        # Test major museum matching
+        print(f"✅ Major museums matched: {len(dashboard.available_major_museums)}")
+        for korean_name, english_name in dashboard.available_major_museums.items():
+            print(f"   - {korean_name} -> {english_name}")
+        
         # Test getting museum data
         if museum_names:
             first_museum = museum_names[0]

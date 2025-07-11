@@ -57,7 +57,12 @@ class RickStevesDashboard:
         for korean_name, english_name in self.major_museums.items():
             # Check if this museum exists in our data
             for museum in all_museums:
-                if english_name.lower() in museum.lower() or korean_name.lower() in museum.lower():
+                # Special handling for Prado Museum
+                if korean_name == "프라도 미술관":
+                    if "prado" in museum.lower():
+                        self.available_major_museums[korean_name] = museum
+                        break
+                elif english_name.lower() in museum.lower() or korean_name.lower() in museum.lower():
                     self.available_major_museums[korean_name] = museum
                     break
         
@@ -514,6 +519,12 @@ class RickStevesDashboard:
         st.sidebar.markdown(f"**Major Museums:** {len(self.available_major_museums)}")
         st.sidebar.markdown(f"**Other Museums:** {len(self.other_museums)}")
         
+        # Global analysis buttons
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 🌍 Global Analysis")
+        show_comparison = st.sidebar.button("🏛️ Museum Comparison")
+        show_global_insights = st.sidebar.button("📈 Global Insights")
+        
         if selected_museum:
             museum_data = self.get_museum_data(selected_museum)
             if museum_data:
@@ -524,131 +535,19 @@ class RickStevesDashboard:
                 st.sidebar.markdown(f"**Replies:** {museum_data.get('total_replies', 0)}")
                 st.sidebar.markdown(f"**Sentiment:** {museum_data.get('audio_guide_sentiment_score', 0):.3f}")
         
-        if not selected_museum:
-            st.warning("Please select a museum from the sidebar.")
-            return
-        
-        # Main content area
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📊 Overview", 
-            "🎯 Analysis", 
-            "📋 Posts", 
-            "🏛️ Comparison",
-            "📈 Global Insights"
-        ])
-        
-        museum_data = self.get_museum_data(selected_museum)
-        if not museum_data:
-            st.error(f"Data not found for {selected_museum}")
-            return
-        
-        with tab1:
-            st.header(f"Overview - {selected_museum}")
-            
-            self.create_overview_metrics(museum_data)
-            
-            st.markdown("### Key Insights")
-            total_reactions = museum_data['positive_reactions'] + museum_data['negative_reactions'] + museum_data['neutral_reactions']
-            st.markdown(f"""
-            - **Total Posts Analyzed:** {museum_data['total_posts']}
-            - **Total Replies:** {museum_data['total_replies']}
-            - **Total Reactions:** {total_reactions}
-            - **Overall Sentiment:** {'Positive' if museum_data['audio_guide_sentiment_score'] > 0.1 else 'Neutral' if museum_data['audio_guide_sentiment_score'] > -0.1 else 'Negative'}
-            - **Sentiment Score:** {museum_data['audio_guide_sentiment_score']:.3f}
-            """)
-        
-        with tab2:
-            st.header(f"Analysis - {selected_museum}")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                self.create_sentiment_chart(museum_data)
-            
-            with col2:
-                self.create_engagement_chart(museum_data)
-            
-            st.markdown("### Common Themes")
-            self.create_themes_chart(museum_data)
-        
-        with tab3:
-            st.header(f"Posts - {selected_museum}")
-            
-            posts = self.get_museum_posts(selected_museum)
-            
-            # Summary at the top
-            st.markdown("### 📊 Posts Summary")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                total_posts = len(posts)
-                st.metric("Total Posts", total_posts)
-            
-            with col2:
-                audio_mentions = len([p for p in posts if p.get('audio_guide_mention')])
-                st.metric("Audio Guide Mentions", audio_mentions)
-            
-            with col3:
-                positive_posts = len([p for p in posts if p.get('sentiment') == 'positive'])
-                st.metric("Positive Posts", positive_posts)
-            
-            with col4:
-                avg_sentiment = sum(p.get('sentiment_score', 0) for p in posts) / max(1, len(posts))
-                st.metric("Average Sentiment", f"{avg_sentiment:.3f}")
-            
-            st.markdown("---")
-            
-            # Filter options
-            st.markdown("### 🔍 Filter Options")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                show_audio_mentions = st.checkbox("Show only audio guide mentions", value=False)
-            
-            with col2:
-                sentiment_filter = st.selectbox(
-                    "Sentiment filter",
-                    ["All", "Positive", "Negative", "Neutral"]
-                )
-            
-            with col3:
-                min_sentiment = st.slider("Minimum sentiment score", -1.0, 1.0, -1.0, 0.1)
-            
-            with col4:
-                text_search = st.text_input("Search in post content", placeholder="Enter keywords...")
-            
-            # Apply filters
-            filtered_posts = posts
-            if show_audio_mentions:
-                filtered_posts = [p for p in filtered_posts if p.get('audio_guide_mention')]
-            
-            filtered_posts = [p for p in filtered_posts if p.get('sentiment_score', 0) >= min_sentiment]
-            
-            if sentiment_filter != "All":
-                filtered_posts = [p for p in filtered_posts if p.get('sentiment') == sentiment_filter.lower()]
-            
-            # Apply text search filter
-            if text_search and text_search.strip():
-                search_term = text_search.lower().strip()
-                filtered_posts = [
-                    p for p in filtered_posts 
-                    if search_term in (p.get('content', '') or '').lower() or search_term in (p.get('title', '') or '').lower()
-                ]
-            
-            st.markdown(f"**📋 Showing {len(filtered_posts)} of {len(posts)} posts**")
-            self.create_posts_table(filtered_posts, text_search)
-        
-        with tab4:
-            st.header("Museum Comparison")
+        # Handle global analysis views
+        if show_comparison:
+            st.header("🏛️ Museum Comparison")
             self.create_museum_comparison()
             
             st.markdown("### Summary Statistics")
             if self.metrics_data:
                 summary_df = pd.DataFrame(self.metrics_data)
                 st.dataframe(summary_df, use_container_width=True)
+            return
         
-        with tab5:
-            st.header("Global Insights")
+        if show_global_insights:
+            st.header("📈 Global Insights")
             
             self.get_comparison_summary()
             
@@ -661,6 +560,187 @@ class RickStevesDashboard:
                 self.get_top_museums_by_sentiment()
             
             self.get_theme_distribution()
+            return
+        
+        if not selected_museum:
+            st.warning("Please select a museum from the sidebar or click a global analysis button.")
+            return
+        
+        # Main content area with museum-specific and global tabs
+        if selected_museum:
+            tab1, tab2, tab3 = st.tabs([
+                "📊 Overview", 
+                "🎯 Analysis", 
+                "📋 Posts"
+            ])
+        else:
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "📊 Overview", 
+                "🎯 Analysis", 
+                "📋 Posts", 
+                "🏛️ Comparison",
+                "📈 Global Insights"
+            ])
+        
+        # Get museum data for selected museum
+        if selected_museum:
+            museum_data = self.get_museum_data(selected_museum)
+            if not museum_data:
+                st.error(f"Data not found for {selected_museum}")
+                return
+        
+        # Museum-specific tabs (only shown when a museum is selected)
+        if selected_museum:
+            with tab1:
+                st.header(f"Overview - {selected_museum}")
+                
+                self.create_overview_metrics(museum_data)
+                
+                st.markdown("### Key Insights")
+                total_reactions = museum_data['positive_reactions'] + museum_data['negative_reactions'] + museum_data['neutral_reactions']
+                st.markdown(f"""
+                - **Total Posts Analyzed:** {museum_data['total_posts']}
+                - **Total Replies:** {museum_data['total_replies']}
+                - **Total Reactions:** {total_reactions}
+                - **Overall Sentiment:** {'Positive' if museum_data['audio_guide_sentiment_score'] > 0.1 else 'Neutral' if museum_data['audio_guide_sentiment_score'] > -0.1 else 'Negative'}
+                - **Sentiment Score:** {museum_data['audio_guide_sentiment_score']:.3f}
+                """)
+            
+            with tab2:
+                st.header(f"Analysis - {selected_museum}")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    self.create_sentiment_chart(museum_data)
+                
+                with col2:
+                    self.create_engagement_chart(museum_data)
+                
+                st.markdown("### Common Themes")
+                self.create_themes_chart(museum_data)
+            
+            with tab3:
+                st.header(f"Posts - {selected_museum}")
+                
+                posts = self.get_museum_posts(selected_museum)
+                
+                # Summary at the top
+                st.markdown("### 📊 Posts Summary")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    total_posts = len(posts)
+                    st.metric("Total Posts", total_posts)
+                
+                with col2:
+                    audio_mentions = len([p for p in posts if p.get('audio_guide_mention')])
+                    st.metric("Audio Guide Mentions", audio_mentions)
+                
+                with col3:
+                    positive_posts = len([p for p in posts if p.get('sentiment') == 'positive'])
+                    st.metric("Positive Posts", positive_posts)
+                
+                with col4:
+                    avg_sentiment = sum(p.get('sentiment_score', 0) for p in posts) / max(1, len(posts))
+                    st.metric("Average Sentiment", f"{avg_sentiment:.3f}")
+                
+                st.markdown("---")
+                
+                # Filter options
+                st.markdown("### 🔍 Filter Options")
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    show_audio_mentions = st.checkbox("Show only audio guide mentions", value=False)
+                
+                with col2:
+                    sentiment_filter = st.selectbox(
+                        "Sentiment filter",
+                        ["All", "Positive", "Negative", "Neutral"]
+                    )
+                
+                with col3:
+                    min_sentiment = st.slider("Minimum sentiment score", -1.0, 1.0, -1.0, 0.1)
+                
+                with col4:
+                    text_search = st.text_input("Search in post content", placeholder="Enter keywords...")
+                
+                # Apply filters
+                filtered_posts = posts
+                if show_audio_mentions:
+                    filtered_posts = [p for p in filtered_posts if p.get('audio_guide_mention')]
+                
+                filtered_posts = [p for p in filtered_posts if p.get('sentiment_score', 0) >= min_sentiment]
+                
+                if sentiment_filter != "All":
+                    filtered_posts = [p for p in filtered_posts if p.get('sentiment') == sentiment_filter.lower()]
+                
+                # Apply text search filter
+                if text_search and text_search.strip():
+                    search_term = text_search.lower().strip()
+                    filtered_posts = [
+                        p for p in filtered_posts 
+                        if search_term in (p.get('content', '') or '').lower() or search_term in (p.get('title', '') or '').lower()
+                    ]
+                
+                st.markdown(f"**📋 Showing {len(filtered_posts)} of {len(posts)} posts**")
+                self.create_posts_table(filtered_posts, text_search)
+        
+        # Global tabs (only shown when no museum is selected)
+        else:
+            with tab1:
+                st.header("📊 Overview")
+                st.markdown("Please select a museum from the sidebar to view detailed analysis.")
+                
+                # Show some general statistics
+                if self.comparison_data:
+                    summary = self.comparison_data.get('summary', {})
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Total Museums", summary.get('total_museums', 0))
+                    
+                    with col2:
+                        st.metric("Total Posts", summary.get('total_posts', 0))
+                    
+                    with col3:
+                        st.metric("Total Replies", summary.get('total_replies', 0))
+                    
+                    with col4:
+                        st.metric("Audio Guide Mentions", summary.get('total_audio_guide_mentions', 0))
+            
+            with tab2:
+                st.header("🎯 Analysis")
+                st.markdown("Please select a museum from the sidebar to view detailed analysis.")
+            
+            with tab3:
+                st.header("📋 Posts")
+                st.markdown("Please select a museum from the sidebar to view posts.")
+            
+            with tab4:
+                st.header("🏛️ Comparison")
+                self.create_museum_comparison()
+                
+                st.markdown("### Summary Statistics")
+                if self.metrics_data:
+                    summary_df = pd.DataFrame(self.metrics_data)
+                    st.dataframe(summary_df, use_container_width=True)
+            
+            with tab5:
+                st.header("📈 Global Insights")
+                
+                self.get_comparison_summary()
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    self.get_top_museums_by_engagement()
+                
+                with col2:
+                    self.get_top_museums_by_sentiment()
+                
+                self.get_theme_distribution()
 
 
 def main():
