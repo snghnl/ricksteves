@@ -958,7 +958,7 @@ def main():
         metrics_path=str(metrics_path),
         comparison_path=str(comparison_path),
         enhanced_posts_path=str(enhanced_posts_path),
-        reactions_dir="."  # Look for reactions files in current directory
+        reactions_dir="data"  # Look for reactions files in data directory
     )
     
     # Run dashboard

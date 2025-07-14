@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import streamlit as st
 
+from constant import DATA_DIR
+
 # Hardcoded Korean translations for each museum
 KOREAN_TRANSLATIONS = {
     "British Museum": {
@@ -87,7 +89,7 @@ KOREAN_TRANSLATIONS = {
 class ReactionsLoader:
     """Load and parse LLM-analyzed reactions from markdown files."""
     
-    def __init__(self, reactions_dir: str = "."):
+    def __init__(self, reactions_dir: Path = DATA_DIR):
         """Initialize with reactions directory path."""
         self.reactions_dir = Path(reactions_dir)
         self.reactions_data = {}
