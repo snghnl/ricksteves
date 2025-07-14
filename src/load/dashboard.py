@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import numpy as np
+from .reactions_loader import ReactionsLoader
 
 # Add this helper function
 def is_running_in_streamlit():
@@ -27,12 +28,14 @@ def is_running_in_streamlit():
 class RickStevesDashboard:
     """Main dashboard class for Rick Steves audio guide analysis."""
     
-    def __init__(self, metrics_path: str, comparison_path: str, enhanced_posts_path: str):
+    def __init__(self, metrics_path: str, comparison_path: str, enhanced_posts_path: str, reactions_dir: str = "."):
         """Initialize dashboard with data paths."""
         self.metrics_path = Path(metrics_path)
         self.comparison_path = Path(comparison_path)
         self.enhanced_posts_path = Path(enhanced_posts_path)
+        self.reactions_dir = reactions_dir
         self.load_data()
+        self.load_reactions()
         self.setup_museum_categories()
     
     def setup_museum_categories(self):
@@ -124,6 +127,19 @@ class RickStevesDashboard:
                 st.stop()
             else:
                 raise
+    
+    def load_reactions(self) -> None:
+        """Load reactions data from markdown files."""
+        try:
+            self.reactions_loader = ReactionsLoader(self.reactions_dir)
+            if is_running_in_streamlit():
+                st.success(f"Loaded reactions for {len(self.reactions_loader.get_museums_with_reactions())} museums")
+        except Exception as e:
+            if is_running_in_streamlit():
+                st.warning(f"Could not load reactions data: {e}")
+            else:
+                print(f"Could not load reactions data: {e}")
+            self.reactions_loader = None
     
     def get_museum_names(self) -> List[str]:
         """Get list of available museum names."""
@@ -490,6 +506,109 @@ class RickStevesDashboard:
         fig.update_layout(xaxis_tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
     
+    def create_reactions_summary(self, museum_name: str) -> None:
+        """Display LLM-analyzed reactions summary for a museum, with Korean translation."""
+        if not hasattr(self, 'reactions_loader') or self.reactions_loader is None:
+            st.info("No reactions data available.")
+            return
+        
+        reactions_data = self.reactions_loader.get_reactions_for_museum(museum_name)
+        if not reactions_data:
+            st.info(f"No reactions data available for {museum_name}.")
+            return
+        
+        st.markdown("### 🎧 LLM-Analyzed Reactions Summary (영어/한국어 병기)")
+        
+        # Overall Summary
+        if reactions_data.get('overall_summary'):
+            st.markdown("#### 📋 Overall Summary / 전체 요약")
+            st.markdown(f"<div style='padding-bottom:4px'><b>EN:</b> {reactions_data['overall_summary']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color:#2d8659'><b>KO:</b> {reactions_data.get('ko_overall_summary','')}</div>", unsafe_allow_html=True)
+            st.markdown("---")
+        
+        # Positive Points
+        if reactions_data.get('positive_points'):
+            st.markdown("#### ✅ Positive Feedback / 긍정적 피드백")
+            for en, ko in zip(reactions_data['positive_points'], reactions_data.get('ko_positive_points', [])):
+                st.write(f"- **EN:** {en}")
+                st.write(f"  <span style='color:#2d8659'>• <b>KO:</b> {ko}</span>", unsafe_allow_html=True)
+            st.markdown("---")
+        
+        # Negative Points
+        if reactions_data.get('negative_points'):
+            st.markdown("#### ❌ Negative Feedback / 부정적 피드백")
+            for en, ko in zip(reactions_data['negative_points'], reactions_data.get('ko_negative_points', [])):
+                st.write(f"- **EN:** {en}")
+                st.write(f"  <span style='color:#b22222'>• <b>KO:</b> {ko}</span>", unsafe_allow_html=True)
+            st.markdown("---")
+        
+        # Recommendation
+        if reactions_data.get('recommendation'):
+            st.markdown("#### 💡 Recommendation / 추천 및 조언")
+            st.markdown(f"<div style='padding-bottom:4px'><b>EN:</b> {reactions_data['recommendation']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color:#2d8659'><b>KO:</b> {reactions_data.get('ko_recommendation','')}</div>", unsafe_allow_html=True)
+    
+    def create_reactions_comparison(self) -> None:
+        """Create a comparison of reactions across all museums."""
+        if not hasattr(self, 'reactions_loader') or self.reactions_loader is None:
+            st.info("No reactions data available for comparison.")
+            return
+        
+        all_reactions = self.reactions_loader.get_all_reactions()
+        if not all_reactions:
+            st.info("No reactions data available for comparison.")
+            return
+        
+        st.markdown("### 🏛️ Reactions Comparison Across Museums")
+        
+        # Create comparison metrics
+        comparison_data = []
+        for museum_name, reactions in all_reactions.items():
+            positive_count = len(reactions.get('positive_points', []))
+            negative_count = len(reactions.get('negative_points', []))
+            total_points = positive_count + negative_count
+            
+            comparison_data.append({
+                'Museum': museum_name,
+                'Positive Points': positive_count,
+                'Negative Points': negative_count,
+                'Total Points': total_points,
+                'Positive Ratio': positive_count / max(1, total_points)
+            })
+        
+        if comparison_data:
+            df = pd.DataFrame(comparison_data)
+            
+            # Create visualization
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                fig = px.bar(
+                    df,
+                    x='Museum',
+                    y=['Positive Points', 'Negative Points'],
+                    title="Positive vs Negative Points by Museum",
+                    barmode='group'
+                )
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                fig = px.bar(
+                    df,
+                    x='Museum',
+                    y='Positive Ratio',
+                    title="Positive Feedback Ratio by Museum",
+                    color='Positive Ratio',
+                    color_continuous_scale='RdYlGn'
+                )
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Display summary table
+            st.markdown("#### 📊 Reactions Summary Table")
+            st.dataframe(df, use_container_width=True)
+    
     def run(self) -> None:
         """Run the main dashboard application."""
         st.set_page_config(
@@ -543,11 +662,18 @@ class RickStevesDashboard:
         st.sidebar.markdown(f"**Major Museums:** {len(self.available_major_museums)}")
         st.sidebar.markdown(f"**Other Museums:** {len(self.other_museums)}")
         
+        # Add reactions statistics if available
+        if hasattr(self, 'reactions_loader') and self.reactions_loader:
+            reactions_museums = self.reactions_loader.get_museums_with_reactions()
+            if reactions_museums:
+                st.sidebar.markdown(f"**Museums with Reactions:** {len(reactions_museums)}")
+        
         # Global analysis buttons
         st.sidebar.markdown("---")
         st.sidebar.markdown("### 🌍 Global Analysis")
         show_comparison = st.sidebar.button("🏛️ Museum Comparison")
         show_global_insights = st.sidebar.button("📈 Global Insights")
+        show_reactions = st.sidebar.button("🎧 Reactions Analysis")
         
         if selected_museum:
             museum_data = self.get_museum_data(selected_museum)
@@ -586,24 +712,31 @@ class RickStevesDashboard:
             self.get_theme_distribution()
             return
         
+        if show_reactions:
+            st.header("🎧 Reactions Analysis")
+            self.create_reactions_comparison()
+            return
+        
         if not selected_museum:
             st.warning("Please select a museum from the sidebar or click a global analysis button.")
             return
         
         # Main content area with museum-specific and global tabs
         if selected_museum:
-            tab1, tab2, tab3 = st.tabs([
+            tab1, tab2, tab3, tab4 = st.tabs([
                 "📊 Overview", 
                 "🎯 Analysis", 
-                "📋 Posts"
+                "📋 Posts",
+                "🎧 Reactions"
             ])
         else:
-            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
                 "📊 Overview", 
                 "🎯 Analysis", 
                 "📋 Posts", 
                 "🏛️ Comparison",
-                "📈 Global Insights"
+                "📈 Global Insights",
+                "🎧 Reactions"
             ])
         
         # Get museum data for selected museum
@@ -710,6 +843,10 @@ class RickStevesDashboard:
                 
                 st.markdown(f"**📋 Showing {len(filtered_posts)} of {len(posts)} posts**")
                 self.create_posts_table(filtered_posts, text_search)
+            
+            with tab4:
+                st.header(f"🎧 Reactions - {selected_museum}")
+                self.create_reactions_summary(selected_museum)
         
         # Global tabs (only shown when no museum is selected)
         else:
@@ -765,6 +902,10 @@ class RickStevesDashboard:
                     self.get_top_museums_by_sentiment()
                 
                 self.get_theme_distribution()
+            
+            with tab6:
+                st.header("🎧 Reactions Analysis")
+                self.create_reactions_comparison()
 
 
 def main():
@@ -816,7 +957,8 @@ def main():
     dashboard = RickStevesDashboard(
         metrics_path=str(metrics_path),
         comparison_path=str(comparison_path),
-        enhanced_posts_path=str(enhanced_posts_path)
+        enhanced_posts_path=str(enhanced_posts_path),
+        reactions_dir="."  # Look for reactions files in current directory
     )
     
     # Run dashboard
