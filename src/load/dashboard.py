@@ -47,7 +47,7 @@ class RickStevesDashboard:
             "루브르 박물관": "Louvre Museum",
             "우피치 미술관": "Uffizi Gallery",
             "메트로폴리탄 미술관": "Metropolitan Museum of Art",
-            "프라도 미술관": "Prado Museum"
+            "프라도 미술관": "Museo del Prado"
         }
         
         # Get all available museum names

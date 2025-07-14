@@ -41,7 +41,7 @@ KOREAN_TRANSLATIONS = {
         ],
         "recommendation": "더 신뢰할 수 있고 덜 좌절스러운 경험을 위해 공식 루브르 오디오 가이드가 권장됩니다. Rick Steves 가이드를 사용할 계획이라면, 박물관의 현재 레이아웃과 완벽하게 일치하지 않을 가능성에 대비해야 합니다."
     },
-    "Prado Museum": {
+    "Museo del Prado": {
         "overall_summary": "프라도 박물관의 오디오 가이드는 일반적으로 그 내용에 대해 칭찬받지만, 사용자 피드백은 가용성과 신뢰성에 상당한 문제가 있음을 보여줍니다. 프라도에는 Rick Steves 오디오 가이드가 없는데, 이는 많은 사람들에게 실망의 원인이 됩니다. 박물관 자체 가이드는 접근 가능할 때 유용한 도구로 여겨집니다.",
         "positive_points": [
             "오디오 가이드의 내용은 큰 박물관을 탐색하는 데 '매우 유용'하고 '매우 좋다'고 여겨집니다.",
@@ -99,7 +99,7 @@ class ReactionsLoader:
         museum_mappings = {
             "british_museum": "British Museum",
             "louvre": "Louvre Museum", 
-            "prado": "Prado Museum",
+            "prado": "Museo del Prado",
             "tate_modern": "Tate Modern",
             "uffizi": "Uffizi Gallery"
         }
@@ -196,9 +196,12 @@ class ReactionsLoader:
         if museum_name in self.reactions_data:
             return self.reactions_data[museum_name]
         
-        # Try partial matching
+        # Try partial matching with more flexible logic
         for key, data in self.reactions_data.items():
-            if museum_name.lower() in key.lower() or key.lower() in museum_name.lower():
+            # Handle special cases for museum name variations
+            if any(term in museum_name.lower() for term in ['prado', 'museo del prado']) and 'prado' in key.lower():
+                return data
+            elif museum_name.lower() in key.lower() or key.lower() in museum_name.lower():
                 return data
         
         return None
